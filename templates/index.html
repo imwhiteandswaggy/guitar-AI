@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Teacher - AI Learning Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: #1d1d1f;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .logo span {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 8px;
+            background: #f5f5f7;
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .mode-btn {
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #86868b;
+        }
+
+        .mode-btn:hover {
+            color: #1d1d1f;
+        }
+
+        .mode-btn.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(52, 199, 89, 0.1);
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #34c759;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+            height: calc(100vh - 200px);
+        }
+
+        /* Video Panel */
+        .video-panel {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-container {
+            flex: 1;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #videoFeed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .overlay-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1d1d1f;
+        }
+
+        /* Audio Detection */
+        .audio-display {
+            text-align: center;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            color: white;
+        }
+
+        /* Chord Trainer */
+        .chord-trainer {
+            padding: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            color: white;
+        }
+
+        .chord-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .chord-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chord-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .chord-btn.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .chord-display {
+            text-align: center;
+        }
+
+        .chord-name {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .chord-progress {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .progress-ring {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: conic-gradient(white var(--progress), rgba(255,255,255,0.2) 0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .progress-inner {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .finger-checklist {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+
+        .finger-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .finger-item.correct {
+            background: rgba(52, 199, 89, 0.3);
+        }
+
+        .finger-item.missing {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .finger-checkbox {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .finger-checkbox.checked {
+            background: #34c759;
+            border-color: #34c759;
+        }
+
+        .perfect-badge {
+            padding: 16px;
+            background: rgba(52, 199, 89, 0.2);
+            border-radius: 12px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+
+        .audio-note {
+            font-size: 72px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 8px;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .audio-freq {
+            font-size: 18px;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+
+        .audio-listening {
+            font-size: 16px;
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        /* Detected Notes */
+        .notes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .note-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: #f5f5f7;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .note-item:hover {
+            background: #e8e8ed;
+            transform: translateX(4px);
+        }
+
+        .note-item.correct {
+            background: rgba(52, 199, 89, 0.1);
+            border: 1px solid rgba(52, 199, 89, 0.3);
+        }
+
+        .note-item.incorrect {
+            background: rgba(255, 149, 0, 0.1);
+            border: 1px solid rgba(255, 149, 0, 0.3);
+        }
+
+        .note-info {
+            flex: 1;
+        }
+
+        .note-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .note-details {
+            font-size: 13px;
+            color: #86868b;
+            font-weight: 500;
+        }
+
+        .note-badge {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: white;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat-box {
+            padding: 16px;
+            background: #f5f5f7;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #86868b;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #86868b;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .empty-text {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Scrollbar */
+        .notes-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .notes-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .notes-list::-webkit-scrollbar-thumb {
+            background: #d1d1d6;
+            border-radius: 4px;
+        }
+
+        .notes-list::-webkit-scrollbar-thumb:hover {
+            background: #86868b;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .sidebar {
+                flex-direction: row;
+            }
+
+            .card {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span>Guitar</span>Teacher
+            </div>
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="setMode('free_play')" id="freePlayBtn">
+                    Free Play
+                </button>
+                <button class="mode-btn" onclick="setMode('chord_trainer')" id="chordTrainerBtn">
+                    Chord Trainer
+                </button>
+            </div>
+            <div class="status">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span id="statusText">Live</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+        <div class="container">
+            <!-- Video Panel -->
+            <div class="video-panel">
+                <div class="video-container">
+                    <img id="videoFeed" src="/video_feed" alt="Camera Feed">
+                    <div class="video-overlay">
+                        <div class="overlay-card" id="fpsDisplay">-- FPS</div>
+                        <div class="overlay-card" id="detectionStatus">Initializing...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Mode-specific content will be inserted here -->
+                <div id="sidebarContent">
+                    <!-- Free Play Mode (default) -->
+                    <div id="freePlayMode">
+                        <!-- Audio Detection Card -->
+                        <div class="card">
+                            <div class="card-title">Audio Detection</div>
+                            <div class="audio-display">
+                                <div id="audioNote" class="audio-note">--</div>
+                                <div id="audioFreq" class="audio-freq">Listening...</div>
+                            </div>
+                        </div>
+
+                        <!-- Detected Notes Card -->
+                        <div class="card" style="flex: 1;">
+                            <div class="card-title">Playing Now</div>
+                            <div id="notesList" class="notes-list">
+                                <div class="empty-state">
+                                    <div class="empty-icon">🎸</div>
+                                    <div class="empty-text">
+                                        Start playing your guitar<br>
+                                        Notes will appear here
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Card -->
+                        <div class="card">
+                            <div class="card-title">Detection Stats</div>
+                            <div class="stats-grid">
+                                <div class="stat-box">
+                                    <div class="stat-value" id="neckStatus">--</div>
+                                    <div class="stat-label">Neck</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-value" id="fretsCount">0</div>
+                                    <div class="stat-label">Frets</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chord Trainer Mode (hidden by default) -->
+                    <div id="chordTrainerMode" style="display: none;">
+                        <!-- Chord Trainer Card -->
+                        <div class="card" style="flex: 1;">
+                            <div class="card-title">Learn Chords</div>
+                            <div class="chord-trainer">
+                                <div class="chord-selector" id="chordSelector">
+                                    <!-- Chord buttons will be inserted here -->
+                                </div>
+                                
+                                <div class="chord-display">
+                                    <div class="chord-name" id="currentChordName">E Minor</div>
+                                    
+                                    <div class="chord-progress">
+                                        <div class="progress-ring" id="progressRing" style="--progress: 0%">
+                                            <div class="progress-inner" id="progressPercent">0%</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="finger-checklist" id="fingerChecklist">
+                                        <!-- Finger checklist will be inserted here -->
+                                    </div>
+                                    
+                                    <div id="perfectBadge" style="display: none;" class="perfect-badge">
+                                        🎉 Perfect! Try the next chord
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Card -->
+                        <div class="card">
+                            <div class="card-title">Detection Stats</div>
+                            <div class="stats-grid">
+                                <div class="stat-box">
+                                    <div class="stat-value" id="neckStatus2">--</div>
+                                    <div class="stat-label">Neck</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-value" id="fretsCount2">0</div>
+                                    <div class="stat-label">Frets</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Current mode
+        let currentMode = 'free_play';
+        let availableChords = [];
+        
+        // Mode switching
+        async function setMode(mode) {
+            try {
+                const response = await fetch(`/set_mode/${mode}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentMode = mode;
+                    
+                    // Update button states
+                    document.getElementById('freePlayBtn').classList.toggle('active', mode === 'free_play');
+                    document.getElementById('chordTrainerBtn').classList.toggle('active', mode === 'chord_trainer');
+                    
+                    // Toggle mode displays
+                    document.getElementById('freePlayMode').style.display = mode === 'free_play' ? 'flex' : 'none';
+                    document.getElementById('chordTrainerMode').style.display = mode === 'chord_trainer' ? 'flex' : 'none';
+                    
+                    // Load chords if entering chord trainer mode
+                    if (mode === 'chord_trainer' && availableChords.length === 0) {
+                        await loadChords();
+                    }
+                }
+            } catch (error) {
+                console.error('Error setting mode:', error);
+            }
+        }
+        
+        // Load available chords
+        async function loadChords() {
+            try {
+                const response = await fetch('/get_chords');
+                const data = await response.json();
+                
+                availableChords = data.beginner_chords || data.chords;
+                
+                // Create chord selector buttons
+                const selector = document.getElementById('chordSelector');
+                selector.innerHTML = availableChords.map((chord, index) => 
+                    `<button class="chord-btn ${index === 0 ? 'active' : ''}" 
+                             onclick="selectChord('${chord}')"
+                             id="chord-${chord.replace(/\s/g, '-')}">
+                        ${chord}
+                    </button>`
+                ).join('');
+            } catch (error) {
+                console.error('Error loading chords:', error);
+            }
+        }
+        
+        // Select a chord
+        async function selectChord(chordName) {
+            try {
+                const response = await fetch(`/set_chord/${encodeURIComponent(chordName)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update button states
+                    document.querySelectorAll('.chord-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    document.getElementById(`chord-${chordName.replace(/\s/g, '-')}`).classList.add('active');
+                    
+                    // Update chord name display
+                    document.getElementById('currentChordName').textContent = chordName;
+                    
+                    // Hide perfect badge when changing chords
+                    document.getElementById('perfectBadge').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error selecting chord:', error);
+            }
+        }
+        
+        // Update detection data
+        let frameCount = 0;
+        let lastTime = Date.now();
+
+        async function updateDetectionData() {
+            try {
+                const response = await fetch('/detection_data');
+                const data = await response.json();
+
+                // Calculate FPS
+                frameCount++;
+                const now = Date.now();
+                if (now - lastTime >= 1000) {
+                    document.getElementById('fpsDisplay').textContent = `${frameCount} FPS`;
+                    frameCount = 0;
+                    lastTime = now;
+                }
+
+                // Update detection status
+                if (data.neck_detected) {
+                    document.getElementById('detectionStatus').textContent = `✓ Guitar Detected`;
+                    document.getElementById('detectionStatus').style.background = 'rgba(52, 199, 89, 0.95)';
+                    document.getElementById('detectionStatus').style.color = 'white';
+                } else {
+                    document.getElementById('detectionStatus').textContent = '⚠ No Guitar';
+                    document.getElementById('detectionStatus').style.background = 'rgba(255, 149, 0, 0.95)';
+                    document.getElementById('detectionStatus').style.color = 'white';
+                }
+
+                if (currentMode === 'free_play') {
+                    updateFreePlayMode(data);
+                } else if (currentMode === 'chord_trainer') {
+                    updateChordTrainerMode(data);
+                }
+
+            } catch (error) {
+                console.error('Error fetching detection data:', error);
+            }
+        }
+        
+        function updateFreePlayMode(data) {
+            // Update audio detection
+            if (data.audio_note) {
+                document.getElementById('audioNote').textContent = data.audio_note;
+                document.getElementById('audioFreq').textContent = `${data.audio_freq.toFixed(1)} Hz`;
+            } else {
+                document.getElementById('audioNote').textContent = '--';
+                document.getElementById('audioFreq').textContent = 'Listening...';
+            }
+
+            // Update stats
+            document.getElementById('neckStatus').textContent = data.neck_detected ? '✓' : '✗';
+            document.getElementById('fretsCount').textContent = data.frets_detected;
+
+            // Update detected notes
+            const notesList = document.getElementById('notesList');
+            if (data.notes && data.notes.length > 0) {
+                notesList.innerHTML = data.notes.map(note => {
+                    const matchClass = note.matches_audio === true ? 'correct' :
+                                      note.matches_audio === false ? 'incorrect' : '';
+                    const badge = note.matches_audio === true ? '✓' :
+                                 note.matches_audio === false ? '?' : '•';
+                    
+                    const position = note.fret === 0 ? 'Open' : `Fret ${note.fret}`;
+                    
+                    return `
+                        <div class="note-item ${matchClass}">
+                            <div class="note-info">
+                                <div class="note-name">${note.note}</div>
+                                <div class="note-details">
+                                    ${note.finger} • String ${note.string} • ${position}
+                                </div>
+                            </div>
+                            <div class="note-badge">${badge}</div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                notesList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🎸</div>
+                        <div class="empty-text">
+                            Start playing your guitar<br>
+                            Notes will appear here
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        function updateChordTrainerMode(data) {
+            // Update stats
+            document.getElementById('neckStatus2').textContent = data.neck_detected ? '✓' : '✗';
+            document.getElementById('fretsCount2').textContent = data.frets_detected;
+            
+            // Update chord evaluation
+            if (data.evaluation && data.target_chord) {
+                const eval = data.evaluation;
+                const chord = data.target_chord;
+                
+                // Update progress ring
+                const progressPercent = Math.round(eval.accuracy);
+                document.getElementById('progressPercent').textContent = `${progressPercent}%`;
+                document.getElementById('progressRing').style.setProperty('--progress', `${progressPercent}%`);
+                
+                // Update finger checklist
+                const checklist = document.getElementById('fingerChecklist');
+                checklist.innerHTML = chord.fingering.map(([string, fret, finger]) => {
+                    const isCorrect = eval.correct_fingers.some(cf => 
+                        cf.target[0] === string && cf.target[1] === fret && cf.target[2] === finger
+                    );
+                    
+                    return `
+                        <div class="finger-item ${isCorrect ? 'correct' : 'missing'}">
+                            <div class="finger-checkbox ${isCorrect ? 'checked' : ''}">
+                                ${isCorrect ? '✓' : ''}
+                            </div>
+                            <div>
+                                <strong>${finger}</strong>: String ${string}, Fret ${fret}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // Show perfect badge if chord is perfect
+                document.getElementById('perfectBadge').style.display = 
+                    eval.is_perfect ? 'block' : 'none';
+            } else {
+                // No fingers detected
+                document.getElementById('progressPercent').textContent = '0%';
+                document.getElementById('progressRing').style.setProperty('--progress', '0%');
+                
+                if (data.target_chord) {
+                    const checklist = document.getElementById('fingerChecklist');
+                    checklist.innerHTML = data.target_chord.fingering.map(([string, fret, finger]) => `
+                        <div class="finger-item missing">
+                            <div class="finger-checkbox"></div>
+                            <div>
+                                <strong>${finger}</strong>: String ${string}, Fret ${fret}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                
+                document.getElementById('perfectBadge').style.display = 'none';
+            }
+        }
+
+        // Update every 100ms for smooth updates
+        setInterval(updateDetectionData, 100);
+    </script>
+</body>
+</html>
