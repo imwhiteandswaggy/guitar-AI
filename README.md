@@ -2,6 +2,24 @@
 
 An AI guitar teaching system that combines computer vision and audio detection to provide real-time feedback on your playing.
 
+> **🎉 NEW! [Try the Web Version →](../../tree/web-app)**  
+> Modern web interface with interactive chord trainer!
+
+## Choose Your Version
+
+### 🌐 [Web App](../../tree/web-app) (Recommended)
+- Beautiful Apple-style interface
+- **Interactive chord trainer** - Learn chords step-by-step
+- Real-time progress feedback
+- Runs in your browser
+- Perfect for beginners!
+
+### 🖥️ Desktop App (This Branch)
+- OpenCV desktop application  
+- Raw video feed with detection overlays
+- For advanced users and developers
+
+
 ## Demo
 
 Point your webcam at your guitar and the app will:
