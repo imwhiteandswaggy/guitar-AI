@@ -15,6 +15,7 @@ import queue
 import sounddevice as sd
 import librosa
 from chord_library import CHORD_LIBRARY, BEGINNER_CHORDS, get_chord_info, evaluate_chord
+from string_refinement import refine_string_positions_with_edges
 
 # ============================================================================
 # CONFIGURATION
@@ -134,14 +135,58 @@ class GuitarDetectionEngine:
         
         print("✓ Detection engine ready!")
     
-    def calculate_string_positions(self, neck_box):
+    def calculate_string_positions(self, neck_box, nut_box=None):
+        """
+        Calculate string positions using tapered spacing model.
+        Strings are wider at the nut and narrower at the bridge.
+        """
         if neck_box is None:
             return []
         
         x1, y1, x2, y2 = neck_box
-        neck_height = y2 - y1
+        neck_bottom = y2
         
-        return [int(y1 + (neck_height * (i + 0.5) / 6)) for i in range(6)]
+        # Use nut top as anchor point if available, otherwise use neck top
+        if nut_box:
+            nut_y_top = nut_box[1]
+        else:
+            nut_y_top = y1
+        
+        neck_height = neck_bottom - nut_y_top
+        
+        if neck_height <= 0:
+            return []
+        
+        # Tapered spacing: wider at nut, narrower at bridge
+        # Typical guitar taper factor: 0.15-0.25
+        taper_factor = 0.2
+        
+        # Spacing calculations
+        spacing_at_nut = neck_height / 5.5  # Wider spacing at nut
+        spacing_at_bridge = neck_height / 6.5  # Narrower spacing at bridge
+        
+        string_positions = []
+        cumulative_y = 0
+        
+        for i in range(6):
+            # Progress from nut (0.0) to bridge (1.0)
+            progress = (i + 0.5) / 6.0
+            
+            # Interpolate spacing based on taper
+            current_spacing = spacing_at_nut * (1 - taper_factor * progress)
+            
+            # First string: half spacing from nut
+            if i == 0:
+                string_y = nut_y_top + current_spacing / 2
+                cumulative_y = current_spacing / 2
+            else:
+                # Add spacing for this string
+                cumulative_y += current_spacing
+                string_y = nut_y_top + cumulative_y
+            
+            string_positions.append(int(string_y))
+        
+        return string_positions
     
     def get_string_from_y(self, y_pos, string_positions):
         if not string_positions:
@@ -211,10 +256,11 @@ class GuitarDetectionEngine:
         h, w = frame.shape[:2]
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-        # Detect frets and neck
+        # Detect frets, neck, and nut
         fret_results = self.fret_model(frame, conf=CONFIDENCE, verbose=False)
         fret_boxes = []
         neck_box = None
+        nut_box = None
         
         for box in fret_results[0].boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -224,8 +270,17 @@ class GuitarDetectionEngine:
                 fret_boxes.append((x1, y1, x2, y2))
             elif class_name == "neck":
                 neck_box = (x1, y1, x2, y2)
+            elif class_name == "nut":
+                nut_box = (x1, y1, x2, y2)
         
-        string_positions = self.calculate_string_positions(neck_box)
+        # Calculate string positions with tapered spacing
+        string_positions = self.calculate_string_positions(neck_box, nut_box)
+        
+        # Refine positions using edge detection
+        if string_positions and neck_box:
+            string_positions = refine_string_positions_with_edges(
+                frame, neck_box, string_positions
+            )
         fret_map = self.map_frets_to_numbers(fret_boxes, neck_box)
         
         # Detect hands and notes

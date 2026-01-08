@@ -10,6 +10,7 @@ from ultralytics import YOLO
 import numpy as np
 import time
 from collections import deque
+from string_refinement import refine_string_positions_with_edges
 
 # ============================================================================
 # CONFIGURATION
@@ -69,22 +70,53 @@ class GeometricGuitarTeacher:
         print("✓ Models loaded!")
         print("✓ Using GEOMETRIC string detection (no calibration needed!)\n")
     
-    def calculate_string_positions(self, neck_box):
-        """Calculate 6 string Y-positions from neck bounding box"""
+    def calculate_string_positions(self, neck_box, nut_box=None):
+        """
+        Calculate 6 string Y-positions using tapered spacing model.
+        Strings are wider at the nut and narrower at the bridge.
+        """
         if neck_box is None:
             return []
         
         x1, y1, x2, y2 = neck_box
-        neck_top = y1
         neck_bottom = y2
-        neck_height = neck_bottom - neck_top
         
-        # Calculate 6 evenly-spaced string positions
+        # Use nut top as anchor point if available, otherwise use neck top
+        if nut_box:
+            nut_y_top = nut_box[1]
+        else:
+            nut_y_top = y1
+        
+        neck_height = neck_bottom - nut_y_top
+        
+        if neck_height <= 0:
+            return []
+        
+        # Tapered spacing: wider at nut, narrower at bridge
+        taper_factor = 0.2
+        spacing_at_nut = neck_height / 5.5  # Wider spacing at nut
+        spacing_at_bridge = neck_height / 6.5  # Narrower spacing at bridge
+        
         string_positions = []
+        cumulative_y = 0
+        
         for i in range(6):
-            # Position each string in the middle of its segment
-            string_y = int(neck_top + (neck_height * (i + 0.5) / 6))
-            string_positions.append(string_y)
+            # Progress from nut (0.0) to bridge (1.0)
+            progress = (i + 0.5) / 6.0
+            
+            # Interpolate spacing based on taper
+            current_spacing = spacing_at_nut * (1 - taper_factor * progress)
+            
+            # First string: half spacing from nut
+            if i == 0:
+                string_y = nut_y_top + current_spacing / 2
+                cumulative_y = current_spacing / 2
+            else:
+                # Add spacing for this string
+                cumulative_y += current_spacing
+                string_y = nut_y_top + cumulative_y
+            
+            string_positions.append(int(string_y))
         
         return string_positions
     
@@ -187,12 +219,13 @@ class GeometricGuitarTeacher:
         h, w = frame.shape[:2]
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-        # Detect frets and neck
+        # Detect frets, neck, and nut
         fret_results = self.fret_model(frame, conf=CONFIDENCE, verbose=False)
         fret_detections = fret_results[0].boxes
         
         fret_boxes = []
         neck_box = None
+        nut_box = None
         
         for box in fret_detections:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -207,9 +240,19 @@ class GeometricGuitarTeacher:
                 cv2.rectangle(frame, (x1, y1), (x2, y2), COLOR_NECK, 3)
                 cv2.putText(frame, "NECK", (x1 + 10, y1 + 25),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, COLOR_NECK, 2)
+            elif class_name == "nut":
+                nut_box = (x1, y1, x2, y2)
+                if self.show_frets:
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 165, 0), 2)
         
-        # Calculate string positions from neck
-        string_positions = self.calculate_string_positions(neck_box)
+        # Calculate string positions with tapered spacing
+        string_positions = self.calculate_string_positions(neck_box, nut_box)
+        
+        # Refine positions using edge detection
+        if string_positions and neck_box:
+            string_positions = refine_string_positions_with_edges(
+                frame, neck_box, string_positions
+            )
         
         # Draw strings
         if self.show_strings and string_positions:
