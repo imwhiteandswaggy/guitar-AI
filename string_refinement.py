@@ -5,88 +5,96 @@ Refines calculated string positions by detecting actual string edges in the imag
 
 import cv2
 import numpy as np
+from string_calibration import (
+    refine_strings_with_fret_intersections,
+    refine_strings_with_edge_detection_improved,
+    refine_strings_multi_method
+)
 
 
-def refine_string_positions_with_edges(frame, neck_box, initial_positions, threshold_ratio=0.15):
+def calculate_confidence_scores(frame, neck_box, initial_positions, refined_positions, 
+                                edge_matches_per_string=None):
     """
-    Refine string positions using edge detection to find actual string locations.
+    Calculate confidence scores for each string position
+    
+    Args:
+        frame: Input frame
+        neck_box: Neck bounding box
+        initial_positions: Initial calculated positions
+        refined_positions: Refined positions from edge detection
+        edge_matches_per_string: Optional list of edge match counts per string
+    
+    Returns:
+        List of confidence scores (0-1) for each string
+    """
+    if not initial_positions or not refined_positions or len(initial_positions) != 6:
+        return [0.5] * 6
+    
+    confidences = []
+    neck_height = neck_box[3] - neck_box[1] if neck_box else 100
+    
+    for i in range(6):
+        initial_pos = initial_positions[i]
+        refined_pos = refined_positions[i]
+        
+        # Edge detection confidence
+        if edge_matches_per_string and i < len(edge_matches_per_string):
+            edge_confidence = min(edge_matches_per_string[i] / 3.0, 1.0)
+        else:
+            edge_confidence = 0.5
+        
+        # Position stability (how close refined is to initial)
+        position_diff = abs(refined_pos - initial_pos)
+        stability = 1.0 - min(position_diff / (neck_height * 0.1), 1.0)
+        
+        # Consistency (how close to expected spacing)
+        if i > 0:
+            spacing = abs(refined_pos - refined_positions[i-1])
+            expected_spacing = neck_height / 6.0
+            consistency = 1.0 - min(abs(spacing - expected_spacing) / expected_spacing, 1.0)
+        else:
+            consistency = 0.7
+        
+        # Combined confidence
+        confidence = (edge_confidence * 0.5 + stability * 0.3 + consistency * 0.2)
+        confidences.append(max(0.0, min(1.0, confidence)))
+    
+    return confidences
+
+
+def refine_string_positions_with_edges(frame, neck_box, initial_positions, 
+                                       fret_map=None, threshold_ratio=0.12):
+    """
+    Refine string positions using improved multi-method approach.
+    Uses fret intersections and improved edge detection for better accuracy.
     
     Args:
         frame: Input BGR frame
         neck_box: Tuple (x1, y1, x2, y2) of neck bounding box
         initial_positions: List of 6 Y-coordinates (calculated string positions)
-        threshold_ratio: Ratio of neck height to use as search threshold (default 0.15)
+        fret_map: Optional fret map for intersection-based refinement
+        threshold_ratio: Ratio of neck height to use as search threshold (default 0.12)
     
     Returns:
-        List of refined Y-coordinates (same length as initial_positions)
+        Tuple: (refined_positions, confidence_scores)
     """
     if neck_box is None or not initial_positions or len(initial_positions) != 6:
-        return initial_positions
+        return initial_positions, [0.5] * 6
     
-    x1, y1, x2, y2 = neck_box
-    
-    # Extract neck ROI
-    neck_roi = frame[y1:y2, x1:x2]
-    if neck_roi.size == 0:
-        return initial_positions
-    
-    # Convert to grayscale
-    gray = cv2.cvtColor(neck_roi, cv2.COLOR_BGR2GRAY)
-    
-    # Blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    
-    # Canny edge detection
-    edges = cv2.Canny(blurred, 50, 150)
-    
-    # HoughLinesP for horizontal lines (strings)
-    # Look for lines that are mostly horizontal (strings)
-    lines = cv2.HoughLinesP(
-        edges, 
-        rho=1, 
-        theta=np.pi/180, 
-        threshold=30,
-        minLineLength=int((x2 - x1) * 0.3),  # At least 30% of neck width
-        maxLineGap=10
+    # Use multi-method refinement
+    refined, edge_match_counts = refine_strings_multi_method(
+        frame, neck_box, fret_map, None, initial_positions,
+        use_fret_intersections=(fret_map is not None),
+        use_edge_detection=True
     )
     
-    if lines is None or len(lines) == 0:
-        return initial_positions
+    # Calculate confidence scores using edge match counts
+    confidences = calculate_confidence_scores(
+        frame, neck_box, initial_positions, refined, 
+        edge_matches_per_string=edge_match_counts
+    )
     
-    # Calculate threshold for matching lines to initial positions
-    neck_height = y2 - y1
-    search_threshold = int(neck_height * threshold_ratio)
-    
-    # Filter horizontal lines and refine positions
-    refined_positions = []
-    
-    for initial_y in initial_positions:
-        # Find lines near this position
-        nearby_line_ys = []
-        
-        for line in lines:
-            x1_line, y1_line, x2_line, y2_line = line[0]
-            
-            # Check if line is mostly horizontal (within 5 pixels vertical difference)
-            if abs(y1_line - y2_line) < 5:
-                # Average Y position of the line
-                line_y_roi = (y1_line + y2_line) // 2
-                
-                # Convert to full frame coordinates
-                line_y_full = y1 + line_y_roi
-                
-                # Check if this line is near our initial position
-                if abs(line_y_full - initial_y) < search_threshold:
-                    nearby_line_ys.append(line_y_full)
-        
-        # Use average of nearby lines, or keep original if no matches
-        if nearby_line_ys:
-            refined_y = int(np.mean(nearby_line_ys))
-            refined_positions.append(refined_y)
-        else:
-            refined_positions.append(initial_y)
-    
-    return refined_positions
+    return refined, confidences
 
 
 def visualize_string_refinement(frame, neck_box, initial_positions, refined_positions):

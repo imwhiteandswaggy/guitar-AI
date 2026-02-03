@@ -10,6 +10,9 @@ import numpy as np
 import time
 from collections import deque
 from string_refinement import refine_string_positions_with_edges
+from chord_overlay import render_chord_overlay, draw_chord_info_overlay
+from chord_library import CHORD_LIBRARY, BEGINNER_CHORDS, get_chord_info
+from string_calibration import manual_string_calibration
 
 # ============================================================================
 # CONFIGURATION
@@ -63,6 +66,15 @@ class MinimalGuitarTeacher:
         self.show_debug = False
         self.fps_history = deque(maxlen=30)
         self.frame_count = 0
+        
+        # Chord overlay state
+        self.overlay_enabled = True
+        self.current_chord_index = 0
+        self.current_chord = BEGINNER_CHORDS[0] if BEGINNER_CHORDS else None
+        self.show_strings = True  # Show by default for debugging
+        
+        # String calibration
+        self.calibrated_strings = None  # Manually calibrated positions
         
         print("✓ Models loaded!")
         print("✓ Clean minimal UI - focus on notes!\n")
@@ -187,16 +199,29 @@ class MinimalGuitarTeacher:
         
         return None
     
+    def is_position_on_neck(self, x, y, neck_box):
+        """Check if position is within neck boundaries"""
+        if neck_box is None:
+            return False
+        
+        nx1, ny1, nx2, ny2 = neck_box
+        margin = 30
+        return (nx1 - margin) <= x <= (nx2 + margin) and (ny1 - margin) <= y <= (ny2 + margin)
+    
     def draw_ui_overlay(self, frame, notes_detected):
         """Draw minimal UI overlay"""
         h, w = frame.shape[:2]
         
         # Top bar - very minimal
-        cv2.rectangle(frame, (0, 0), (w, 50), COLOR_BG, -1)
-        cv2.rectangle(frame, (0, 0), (w, 50), COLOR_NOTE, 1)
+        cv2.rectangle(frame, (0, 0), (w, 80), COLOR_BG, -1)
+        cv2.rectangle(frame, (0, 0), (w, 80), COLOR_NOTE, 1)
         
         cv2.putText(frame, "GUITAR TEACHER", (20, 30),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, COLOR_NOTE, 2)
+        
+        # Chord info overlay
+        if self.current_chord:
+            draw_chord_info_overlay(frame, self.current_chord, self.overlay_enabled, x=20, y=55)
         
         # FPS
         if self.fps_history:
@@ -211,9 +236,14 @@ class MinimalGuitarTeacher:
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_BG, 2)
         
         # Bottom help
-        help_text = "D: Debug | H: Hand skeleton | Q: Quit"
+        help_text = "D: Debug | H: Hand | O: Overlay | C: Chord | S: Strings | K: Calibrate | Q: Quit"
         cv2.putText(frame, help_text, (20, h - 15),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+        
+        # Show calibration status
+        if self.calibrated_strings:
+            cv2.putText(frame, "CALIBRATED", (w - 150, h - 15),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
     
     def process_frame(self, frame):
         """Process a single frame"""
@@ -248,17 +278,61 @@ class MinimalGuitarTeacher:
                 if self.show_debug:
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 165, 0), 1)
         
-        # Calculate string positions with tapered spacing
-        string_positions = self.calculate_string_positions(neck_box, nut_box)
-        
-        # Refine positions using edge detection
-        if string_positions and neck_box:
-            string_positions = refine_string_positions_with_edges(
-                frame, neck_box, string_positions
-            )
+        # Calculate string positions
+        if self.calibrated_strings:
+            # Use manually calibrated positions
+            string_positions = self.calibrated_strings
+        else:
+            # Calculate with tapered spacing
+            string_positions = self.calculate_string_positions(neck_box, nut_box)
+            
+            # Ensure string positions are ordered correctly (string 1 at top = smaller Y)
+            if string_positions and len(string_positions) == 6:
+                # Always sort so smallest Y is first (string 1 = high E = top)
+                # This handles cases where neck_box might be inverted
+                sorted_with_indices = sorted(enumerate(string_positions), key=lambda x: x[1])
+                # Reorder to maintain string order (0-5) but ensure Y increases
+                if sorted_with_indices[0][0] != 0:
+                    # Positions are not in order, need to reorder
+                    # Find which index corresponds to which string
+                    reordered = [0] * 6
+                    for orig_idx, y_pos in sorted_with_indices:
+                        # Map original index to new position
+                        reordered[orig_idx] = y_pos
+                    # If first string (index 0) is not at top, reverse
+                    if sorted_with_indices[0][0] == 5:
+                        # Last string is at top, reverse everything
+                        string_positions = string_positions[::-1]
+                        print("Warning: String positions were inverted, corrected")
+                # Final check: ensure first Y < last Y
+                if string_positions[-1] < string_positions[0]:
+                    string_positions = string_positions[::-1]
+                    print("Warning: String positions were inverted (final check), corrected")
+            
+            # Refine positions using improved multi-method approach
+            if string_positions and neck_box:
+                fret_map = self.map_frets_to_numbers(fret_boxes, neck_box)
+                string_positions = refine_string_positions_with_edges(
+                    frame, neck_box, string_positions, fret_map=fret_map
+                )
+                
+                # Ensure still ordered correctly after refinement
+                if len(string_positions) == 6 and string_positions[-1] < string_positions[0]:
+                    string_positions = string_positions[::-1]
         
         # Map frets
         fret_map = self.map_frets_to_numbers(fret_boxes, neck_box)
+        
+        # Debug: Draw string positions with labels
+        if string_positions and neck_box and (self.show_debug or self.show_strings):
+            x1, y1, x2, y2 = neck_box
+            string_names = ['E1', 'B2', 'G3', 'D4', 'A5', 'E6']
+            for i, string_y in enumerate(string_positions):
+                # Draw line
+                cv2.line(frame, (x1, string_y), (x2, string_y), (0, 255, 255), 1)
+                # Label
+                cv2.putText(frame, f"S{i+1}", (x1 + 5, string_y - 5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
         
         # Detect hands
         hand_results = self.hands.process(frame_rgb)
@@ -325,6 +399,41 @@ class MinimalGuitarTeacher:
                         cv2.putText(frame, sublabel, (fx + 35, fy + 20),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
         
+        # Render chord overlay if enabled
+        if self.overlay_enabled and self.current_chord:
+            chord_info = get_chord_info(self.current_chord)
+            if chord_info:
+                # Collect detected fingers for feedback
+                detected_fingers = []
+                if hand_results.multi_hand_landmarks:
+                    for hand_landmarks in hand_results.multi_hand_landmarks:
+                        fingertip_ids = [4, 8, 12, 16, 20]
+                        finger_names = ["Thumb", "Index", "Middle", "Ring", "Pinky"]
+                        
+                        for tip_id, finger_name in zip(fingertip_ids, finger_names):
+                            landmark = hand_landmarks.landmark[tip_id]
+                            fx = int(landmark.x * w)
+                            fy = int(landmark.y * h)
+                            
+                            if not self.is_position_on_neck(fx, fy, neck_box):
+                                continue
+                            
+                            string_num = self.get_string_from_y(fy, string_positions)
+                            fret_num = self.get_fret_from_position(fx, fret_map, neck_box)
+                            
+                            if string_num and fret_num is not None:
+                                detected_fingers.append({
+                                    'finger': finger_name,
+                                    'string': string_num,
+                                    'fret': fret_num
+                                })
+                
+                # Render overlay
+                frame = render_chord_overlay(
+                    frame, chord_info, neck_box, fret_map, string_positions,
+                    detected_fingers=detected_fingers, show_strings=self.show_strings
+                )
+        
         # Draw UI
         self.draw_ui_overlay(frame, notes_detected)
         
@@ -344,7 +453,15 @@ class MinimalGuitarTeacher:
         print("Controls:")
         print("  D - Toggle debug overlay (show frets/neck)")
         print("  H - Toggle hand skeleton")
+        print("  O - Toggle chord overlay")
+        print("  C - Next chord in progression")
+        print("  S - Toggle string lines")
+        print("  K - Manual string calibration (click on strings)")
+        print("  R - Reset calibration (use auto-detection)")
         print("  Q - Quit")
+        print("="*60)
+        if self.current_chord:
+            print(f"Current chord: {self.current_chord}")
         print("="*60 + "\n")
         
         start_time = time.time()
@@ -376,6 +493,37 @@ class MinimalGuitarTeacher:
             elif key == ord('h'):
                 self.show_hand_skeleton = not self.show_hand_skeleton
                 print(f"Hand skeleton: {'ON' if self.show_hand_skeleton else 'OFF'}")
+            elif key == ord('o'):
+                self.overlay_enabled = not self.overlay_enabled
+                print(f"Chord overlay: {'ON' if self.overlay_enabled else 'OFF'}")
+            elif key == ord('c'):
+                if BEGINNER_CHORDS:
+                    self.current_chord_index = (self.current_chord_index + 1) % len(BEGINNER_CHORDS)
+                    self.current_chord = BEGINNER_CHORDS[self.current_chord_index]
+                    print(f"Switched to chord: {self.current_chord}")
+            elif key == ord('s'):
+                self.show_strings = not self.show_strings
+                print(f"String lines: {'ON' if self.show_strings else 'OFF'}")
+            elif key == ord('k'):
+                # Manual calibration
+                if neck_box is None:
+                    print("Error: Neck not detected. Please ensure guitar is visible.")
+                else:
+                    print("Starting manual string calibration...")
+                    print("Click on each string (1-6, top to bottom) in the calibration window")
+                    print("Press ESC to cancel, ENTER when done")
+                    ret, cal_frame = cap.read()
+                    if ret:
+                        calibrated = manual_string_calibration(cal_frame.copy(), neck_box)
+                        if calibrated:
+                            self.calibrated_strings = calibrated
+                            print(f"Calibration complete! String positions: {calibrated}")
+                        else:
+                            print("Calibration cancelled")
+            elif key == ord('r'):
+                # Reset calibration
+                self.calibrated_strings = None
+                print("Calibration reset - using auto-detection")
         
         cap.release()
         cv2.destroyAllWindows()

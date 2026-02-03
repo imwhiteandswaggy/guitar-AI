@@ -76,6 +76,18 @@ def get_chord_info(chord_name):
         'finger_count': len(CHORD_LIBRARY[chord_name])
     }
 
+
+def get_finger_number(finger_name):
+    """Convert finger name to number"""
+    finger_map = {
+        "Index": 1,
+        "Middle": 2,
+        "Ring": 3,
+        "Pinky": 4,
+        "Thumb": 0
+    }
+    return finger_map.get(finger_name, 0)
+
 def check_finger_position(detected_finger, target_position, tolerance=0.5):
     """
     Check if a detected finger matches a target position

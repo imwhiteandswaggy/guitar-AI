@@ -44,6 +44,25 @@ runs/
 *.pt.bak
 *.pth.bak
 
+# Model files (too large for GitHub - use download_model.py)
+*.pt
+*.pth
+*.onnx
+*.weights
+trained_models/*/weights/*.pt
+
+# Training visualization files
+*.jpg
+*.png
+*.csv
+train_batch*.jpg
+val_batch*.jpg
+*_batch*.jpg
+*_curve.png
+confusion_matrix*.png
+results.png
+labels.jpg
+
 # Data (don't commit large datasets)
 datasets/
 raw_data/
@@ -55,8 +74,16 @@ raw_data/
 # Temporary files
 *.tmp
 *.cache
+
 # Project-specific datasets (don't upload)
 yolo_dataset/
 synthetic_output/
 string.v1i.yolov8/
 guitar-1/
+
+# Old/unused model directories
+trained_models/guitar_detection/
+trained_models/real_guitar_test/
+trained_models/real_guitar_test2/
+trained_models/string_detection/
+trained_models/string_detection2/
