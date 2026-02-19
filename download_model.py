@@ -25,16 +25,16 @@ def download_file(url, destination):
         print(f"Downloading model from {url}...")
         print(f"Destination: {destination}")
         urllib.request.urlretrieve(url, destination, show_progress)
-        print("\n✓ Download complete!")
+        print("\n[OK] Download complete!")
         return True
     except Exception as e:
-        print(f"\n✗ Download failed: {e}")
+        print(f"\n[FAIL] Download failed: {e}")
         return False
 
 def main():
     # Check if model already exists
     if os.path.exists(MODEL_PATH):
-        print(f"✓ Model already exists at {MODEL_PATH}")
+        print(f"[OK] Model already exists at {MODEL_PATH}")
         print("Skipping download.")
         return
     
@@ -52,7 +52,7 @@ def main():
     if success:
         print()
         print("="*60)
-        print("✓ Model downloaded successfully!")
+        print("[OK] Model downloaded successfully!")
         print("="*60)
         print(f"Model location: {MODEL_PATH}")
         print()
@@ -61,7 +61,7 @@ def main():
     else:
         print()
         print("="*60)
-        print("✗ Download failed")
+        print("[FAIL] Download failed")
         print("="*60)
         print()
         print("Alternative options:")
