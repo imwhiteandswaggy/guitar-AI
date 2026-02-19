@@ -1,361 +1,93 @@
-# 🎸 Guitar Teacher AI - Learn Guitar with AI
+# Guitar Teacher AI
 
-An AI-powered guitar learning app that uses computer vision and audio detection to provide real-time feedback on your playing. Point your camera at your guitar and see chord overlays, note detection, and finger position guidance in real-time.
+I built this because I wanted a guitar coach that actually watches you play—like having someone sit across from you and tell you where to put your fingers. Point your camera at your guitar, pick a chord, and it overlays the finger positions right on the neck in real time. It also listens to what you're playing so you get both visual and audio feedback.
 
-![Guitar Teacher AI](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+## What it does
 
-## ✨ Features
+- **Chord overlay** – AR-style dots and finger numbers projected onto your guitar neck
+- **Hand tracking** – Uses your camera to see where your fingers are
+- **Audio detection** – Picks up the notes you're playing and checks if they match
+- **Chord trainer** – Pick a chord, play it, and get a score on how well you're hitting the right spots
+- **Works with any camera** – Webcam, phone, whatever you've got
 
-- **🎯 Real-Time Chord Overlay** - AR-style chord diagrams projected directly on your guitar
-- **🎵 Audio Detection** - Real-time pitch detection with 99% accuracy
-- **👋 Hand Tracking** - MediaPipe hand tracking for finger position detection
-- **🎸 Visual Feedback** - See exactly which strings and frets you're pressing
-- **📱 Universal Camera Support** - Works with webcam, iPhone, Android, or any camera
-- **🌐 Web-Based UI** - Modern, responsive interface accessible from any device
-- **🎨 Professional Design** - Clean, polished UI with smooth animations
+## Quick start
 
-## 🚀 Quick Start
+You'll need Python 3.8+, a camera, and a guitar.
 
-### Prerequisites
+**Windows:** Run `setup.bat`  
+**Mac/Linux:** Run `chmod +x setup.sh` then `./setup.sh`
 
-- **Python 3.8+** (3.9+ recommended)
-- **Webcam or camera-enabled device**
-- **Guitar** (acoustic or electric)
-- **Windows/Mac/Linux** (all supported)
+That'll set up the venv, install dependencies, and download the model. Then:
 
-### Installation
-
-#### Option 1: Automated Setup (Recommended)
-
-**Windows:**
-```bash
-# Download and run setup script
-setup.bat
-```
-
-**Mac/Linux:**
-```bash
-# Make script executable and run
-chmod +x setup.sh
-./setup.sh
-```
-
-#### Option 2: Manual Setup
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/imwhiteandswaggy/guitar-AI.git
-cd guitar-AI
-```
-
-2. **Create virtual environment (recommended):**
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Mac/Linux
-python3 -m venv venv
-source venv/bin/activate
-```
-
-3. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Download model file:**
-```bash
-# The model file is too large for GitHub
-# Run the download script:
-python download_model.py
-
-# Or manually download from:
-# https://github.com/imwhiteandswaggy/guitar-AI/releases/download/v1.0/best.pt
-# Place it in: trained_models/real_guitar_test3/weights/best.pt
-```
-
-5. **Run the app:**
 ```bash
 python app.py
 ```
 
-6. **Open in browser:**
-```
-http://localhost:5000
-```
+Open http://localhost:5000 in your browser. Let it use your camera, point it at your guitar, and you're good to go.
 
-## 📖 Usage
+**Manual setup** if the scripts don't work for you:
 
-### Web Interface
-
-1. **Start the app** - Run `python app.py`
-2. **Open browser** - Navigate to `http://localhost:5000`
-3. **Allow camera access** - Grant permissions when prompted
-4. **Position your guitar** - Point camera at guitar neck
-5. **Start learning!** - Select a chord and follow the overlay
-
-### Controls
-
-- **Camera Selector** - Choose your camera from dropdown
-- **Free Play Mode** - See detected notes in real-time
-- **Chord Trainer Mode** - Learn chords with visual guidance
-- **Overlay Toggle** - Show/hide chord overlays
-- **Calibrate** - Manually calibrate string positions for accuracy
-
-### Keyboard Shortcuts (Desktop)
-
-- **C** - Cycle through chords
-- **O** - Toggle overlay
-- **K** - Manual string calibration
-- **R** - Reset calibration
-
-## 🛠️ Troubleshooting
-
-### Camera Not Working
-
-**Problem:** Camera doesn't open or shows black screen
-
-**Solutions:**
-1. Check camera permissions (especially on Mac)
-2. Try different camera from dropdown
-3. Close other apps using camera
-4. Restart the app
-
-**Mac specific:**
 ```bash
-# Grant camera permissions
-# System Preferences > Security & Privacy > Camera
+git clone https://github.com/imwhiteandswaggy/guitar-AI.git
+cd guitar-AI
+python -m venv venv
+# Windows: venv\Scripts\activate
+# Mac/Linux: source venv/bin/activate
+pip install -r requirements.txt
+python download_model.py   # Model's too big for GitHub, gotta download separately
+python app.py
 ```
 
-**Linux specific:**
-```bash
-# Install v4l2 backend
-sudo apt-get install v4l-utils
-```
+## Using it
 
-### Audio Not Working
+1. Run the app and open it in your browser
+2. Allow camera access
+3. Point the camera at your guitar neck (you want the fretboard in view)
+4. Use the chord selector to pick what you want to learn
+5. The overlay shows where to put your fingers—try to match it
 
-**Problem:** No audio detection
+There's a **Debug** button if you want to see the raw detection (neck box, frets, string lines). **Calibrate** lets you manually click on each string if the auto-detection is off. **Raw** shows the camera feed with no processing.
 
-**Solutions:**
-1. Check microphone permissions
-2. Run audio device tester:
-   ```bash
-   python test_audio_devices.py
-   ```
-3. Select correct audio device
-4. Check microphone is not muted
+## When things go wrong
 
-### Model File Missing
+**Camera's black or not working** – Close other apps using the camera (Zoom, Teams, etc.). Try a different camera from the dropdown. On Mac, check System Preferences > Security & Privacy > Camera.
 
-**Problem:** `FileNotFoundError: trained_models/real_guitar_test3/weights/best.pt`
+**No audio detection** – Check mic permissions. The app auto-detects your default input, but if it's wrong you might need to dig into the code.
 
-**Solution:**
-```bash
-# Download model
-python download_model.py
+**"Model file not found"** – Run `python download_model.py`. The trained model is ~50MB so it's not in the repo.
 
-# Or manually:
-# 1. Go to: https://github.com/imwhiteandswaggy/guitar-AI/releases
-# 2. Download best.pt
-# 3. Place in: trained_models/real_guitar_test3/weights/
-```
+**Port already in use** – The app will try 5000, then 5001, 5002... so you should be fine. If not, something else might be hogging ports.
 
-### Dependencies Installation Issues
+**Strings look wrong** – Hit **Calibrate** and click on each string from top to bottom (thinnest to thickest). That usually fixes it.
 
-**Problem:** `pip install` fails
+## How it works (the short version)
 
-**Solutions:**
+I trained a YOLO model on a bunch of labeled guitar images to detect the neck, frets, and nut. Strings are trickier—pure ML was too noisy—so I use a geometric model (tapered spacing, wider at the nut) and refine it with edge detection and fret intersections. Hand tracking is MediaPipe. Audio is librosa for pitch detection. Everything runs in a Flask app that streams the video with overlays to your browser.
 
-**Windows:**
-```bash
-# Install Visual C++ Build Tools if needed
-# Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
-```
-
-**Mac:**
-```bash
-# Install Xcode Command Line Tools
-xcode-select --install
-```
-
-**Linux:**
-```bash
-# Install system dependencies
-sudo apt-get update
-sudo apt-get install python3-dev python3-pip libopencv-dev
-```
-
-### Port Already in Use
-
-**Problem:** `Address already in use`
-
-**Solution:**
-```bash
-# Change port in app.py (last line)
-app.run(debug=True, host='0.0.0.0', port=5001)  # Use different port
-```
-
-## 📁 Project Structure
+## Project structure
 
 ```
-guitar-AI/
-├── app.py                          # Main Flask web app
-├── guitar_teacher_*.py             # Standalone versions
-├── chord_library.py                # Chord definitions
-├── chord_overlay.py                # Overlay rendering
-├── string_refinement.py            # String position refinement
-├── string_tracking.py              # Temporal smoothing
-├── string_calibration.py           # Calibration utilities
-├── requirements.txt                # Python dependencies
-├── setup.sh / setup.bat            # Setup scripts
-├── download_model.py               # Model downloader
-├── templates/
-│   └── index.html                  # Web UI
-├── static/
-│   ├── css/
-│   │   └── styles.css              # Styles
-│   └── js/
-│       └── app.js                  # Frontend logic
-└── trained_models/
-    └── real_guitar_test3/
-        └── weights/
-            └── best.pt              # YOLOv8 model (download separately)
+app.py              # Main web app
+chord_library.py    # Chord fingerings
+chord_overlay.py    # Draws the dots on the neck
+string_*.py         # String position math, refinement, smoothing
+templates/          # HTML
+static/             # CSS, JS
+trained_models/     # YOLO weights (download separately)
 ```
 
-## 🔧 Configuration
+## Stuff I'd like to add someday
 
-### Camera Settings
+- Different tunings
+- Chord progressions / song mode
+- Recording and playback
+- Better handling for weird lighting
+- Maybe a proper mobile app
 
-Edit `app.py` to change camera defaults:
-```python
-# Line ~380
-camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)   # Width
-camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)   # Height
-camera.set(cv2.CAP_PROP_FPS, 30)             # FPS
-```
+## Credits
 
-### Audio Settings
-
-Audio device is auto-detected. To use specific device:
-```python
-# Edit app.py line ~172
-self.audio.start(device=YOUR_DEVICE_ID)  # Get ID from test_audio_devices.py
-```
-
-### Model Path
-
-If model is in different location:
-```python
-# Edit app.py line ~26
-FRET_MODEL = "path/to/your/model.pt"
-```
-
-## 🎯 How It Works
-
-### Computer Vision Pipeline
-
-1. **YOLOv8 Detection** - Detects frets, neck, and nut (90%+ accuracy)
-2. **String Calculation** - Geometric calculation with tapered spacing
-3. **Edge Refinement** - Edge detection refines string positions
-4. **Temporal Smoothing** - EMA filtering prevents glitchy detection
-5. **Hand Tracking** - MediaPipe tracks finger positions
-6. **Position Mapping** - Maps fingers to strings and frets
-
-### Audio Pipeline
-
-1. **Real-time Capture** - Records from default microphone
-2. **Pitch Detection** - Librosa piptrack for frequency analysis
-3. **Note Conversion** - Converts frequency to musical note
-4. **Cross-Validation** - Validates visual predictions
-
-### Overlay System
-
-1. **Chord Selection** - User selects chord to learn
-2. **Position Calculation** - Converts (string, fret) to pixel coordinates
-3. **Perspective Correction** - Adjusts for camera angle
-4. **Rendering** - Draws dots, finger numbers, and note names
-5. **Feedback** - Shows green when fingers match positions
-
-## 🧪 Testing
-
-### Test Audio Devices
-```bash
-python test_audio_devices.py
-```
-
-### Test String Detection
-```bash
-python test_string_detection.py
-```
-
-### Test Model Loading
-```python
-from ultralytics import YOLO
-model = YOLO("trained_models/real_guitar_test3/weights/best.pt")
-print("✓ Model loaded successfully")
-```
-
-## 📊 Performance
-
-- **Detection Speed**: 20-30 FPS on CPU, 60+ FPS on GPU
-- **Accuracy**: 
-  - Fret detection: 90.4% mAP
-  - Neck detection: 97.6% mAP
-  - String positions: 85-95% (with calibration)
-- **Latency**: <100ms end-to-end
-
-## 🌍 Platform Support
-
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Windows 10/11 | ✅ Full | Tested on Windows 10/11 |
-| macOS | ✅ Full | Requires camera permissions |
-| Linux | ✅ Full | May need v4l2 backend |
-| iPhone Safari | ✅ Partial | Camera works, some features limited |
-| Android Chrome | ✅ Partial | Camera works, some features limited |
-
-## 🤝 Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Areas for Improvement
-
-- [ ] Support for different tunings
-- [ ] More chord variations
-- [ ] Song mode (chord progressions)
-- [ ] Recording and playback
-- [ ] Mobile app version
-- [ ] Better lighting compensation
-- [ ] GPU acceleration options
-
-## 📝 License
-
-MIT License - feel free to use, modify, and distribute.
-
-## 🙏 Acknowledgments
-
-- **YOLOv8** by Ultralytics
-- **MediaPipe** by Google
-- **Librosa** for audio processing
-- **Flask** for web framework
-- Training data from Roboflow guitar datasets
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/imwhiteandswaggy/guitar-AI/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/imwhiteandswaggy/guitar-AI/discussions)
-
-## 🎓 Learning Resources
-
-- [YOLOv8 Documentation](https://docs.ultralytics.com/)
-- [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands.html)
-- [Librosa Tutorial](https://librosa.org/doc/latest/tutorial.html)
+Built with YOLOv8 (Ultralytics), MediaPipe, Librosa, and Flask. Training data from Roboflow guitar datasets.
 
 ---
 
-**Built with ❤️ for guitar learners everywhere**
-
-*Last updated: January 2026*
+If you run into issues, open one on [GitHub](https://github.com/imwhiteandswaggy/guitar-AI/issues). Happy playing.
