@@ -613,9 +613,9 @@ def generate_frames():
             detected_notes = []
             
             if neck_box and string_positions and detection_counter % 2 == 0:
-                hand_results_for_data = engine.hands.process(frame_rgb)
-                if hand_results_for_data and hand_results_for_data.multi_hand_landmarks:
-                    for hand_landmarks in hand_results_for_data.multi_hand_landmarks:
+                hand_result = engine.hands.process(frame_rgb)
+                if hand_result and hand_result.multi_hand_landmarks:
+                    for hand_landmarks in hand_result.multi_hand_landmarks:
                         for tip_id, finger_name in zip([4, 8, 12, 16, 20], ["Thumb", "Index", "Middle", "Ring", "Pinky"]):
                             lm = hand_landmarks.landmark[tip_id]
                             fx, fy = int(lm.x * w), int(lm.y * h)

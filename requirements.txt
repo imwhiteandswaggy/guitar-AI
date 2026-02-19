@@ -5,7 +5,7 @@ flask-cors>=4.0.0
 # Core ML/CV libraries
 ultralytics>=8.0.0
 opencv-python>=4.8.0
-mediapipe>=0.10.0
+mediapipe>=0.10.0,<=0.10.21
 
 # Audio processing
 librosa>=0.10.0
