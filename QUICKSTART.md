@@ -5,7 +5,7 @@ Get up and running in 5 minutes!
 ## Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/imwhiteandswaggy/guitar-AI.git
+git clone https://github.com/winfieldhunter/guitar-AI.git
 cd guitar-AI
 ```
 

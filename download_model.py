@@ -7,7 +7,7 @@ import os
 import urllib.request
 import sys
 
-MODEL_URL = "https://github.com/imwhiteandswaggy/guitar-AI/releases/download/v1.0/best.pt"
+MODEL_URL = "https://github.com/winfieldhunter/guitar-AI/releases/download/v1.0/best.pt"
 MODEL_PATH = "trained_models/real_guitar_test3/weights/best.pt"
 
 def download_file(url, destination):

@@ -28,7 +28,7 @@ Open http://localhost:5000 in your browser. Let it use your camera, point it at 
 **Manual setup** if the scripts don't work for you:
 
 ```bash
-git clone https://github.com/imwhiteandswaggy/guitar-AI.git
+git clone https://github.com/winfieldhunter/guitar-AI.git
 cd guitar-AI
 python -m venv venv
 # Windows: venv\Scripts\activate
@@ -90,4 +90,4 @@ Built with YOLOv8 (Ultralytics), MediaPipe, Librosa, and Flask. Training data fr
 
 ---
 
-If you run into issues, open one on [GitHub](https://github.com/imwhiteandswaggy/guitar-AI/issues). Happy playing.
+If you run into issues, open one on [GitHub](https://github.com/winfieldhunter/guitar-AI/issues). Happy playing.
