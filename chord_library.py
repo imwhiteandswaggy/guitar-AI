@@ -69,7 +69,6 @@ def get_chord_info(chord_name):
     """Get chord fingering information"""
     if chord_name not in CHORD_LIBRARY:
         return None
-    
     return {
         'name': chord_name,
         'fingering': CHORD_LIBRARY[chord_name],
@@ -77,20 +76,9 @@ def get_chord_info(chord_name):
     }
 
 
-def get_finger_number(finger_name):
-    """Convert finger name to number"""
-    finger_map = {
-        "Index": 1,
-        "Middle": 2,
-        "Ring": 3,
-        "Pinky": 4,
-        "Thumb": 0
-    }
-    return finger_map.get(finger_name, 0)
-
 def check_finger_position(detected_finger, target_position, tolerance=0.5):
     """
-    Check if a detected finger matches a target position
+    Check if a detected finger matches a target position.
     
     Args:
         detected_finger: dict with 'string', 'fret', 'finger'
@@ -102,62 +90,44 @@ def check_finger_position(detected_finger, target_position, tolerance=0.5):
     """
     target_string, target_fret, target_finger = target_position
     
-    # Check if it's the right finger
     if detected_finger['finger'] != target_finger:
         return False
-    
-    # Check if it's the right string
     if detected_finger['string'] != target_string:
         return False
-    
-    # Check if it's the right fret (with tolerance)
-    fret_diff = abs(detected_finger['fret'] - target_fret)
-    if fret_diff > tolerance:
+    if abs(detected_finger['fret'] - target_fret) > tolerance:
         return False
     
     return True
 
+
 def evaluate_chord(detected_fingers, chord_name):
     """
-    Evaluate how well the detected fingers match the target chord
+    Evaluate how well the detected fingers match the target chord.
     
     Returns:
-        dict: {
-            'correct_fingers': [...],
-            'missing_fingers': [...],
-            'incorrect_fingers': [...],
-            'accuracy': 0-100
-        }
+        dict with correct_fingers, missing_fingers, incorrect_fingers, accuracy
     """
     chord_info = get_chord_info(chord_name)
     if not chord_info:
         return None
     
     target_positions = chord_info['fingering']
-    
     correct_fingers = []
     missing_fingers = []
-    incorrect_fingers = list(detected_fingers)  # Start with all detected
+    incorrect_fingers = list(detected_fingers)
     
-    # Check each target position
     for target_pos in target_positions:
         found = False
-        
         for detected in detected_fingers:
             if check_finger_position(detected, target_pos):
-                correct_fingers.append({
-                    'target': target_pos,
-                    'detected': detected
-                })
+                correct_fingers.append({'target': target_pos, 'detected': detected})
                 if detected in incorrect_fingers:
                     incorrect_fingers.remove(detected)
                 found = True
                 break
-        
         if not found:
             missing_fingers.append(target_pos)
     
-    # Calculate accuracy
     total_required = len(target_positions)
     correct_count = len(correct_fingers)
     accuracy = (correct_count / total_required * 100) if total_required > 0 else 0

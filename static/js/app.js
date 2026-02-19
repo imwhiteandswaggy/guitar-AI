@@ -1,5 +1,5 @@
 // ============================================================================
-// Guitar Teacher - Professional Web App JavaScript
+// Guitar Teacher - Web App JavaScript
 // ============================================================================
 
 // State Management
@@ -10,11 +10,14 @@ const state = {
     availableCameras: [],
     currentCameraId: 0,
     overlayEnabled: true,
+    debugMode: false,
+    rawFeed: false,
     frameCount: 0,
     lastTime: Date.now(),
     fps: 0,
     calibrationMode: false,
-    calibrationClicks: []
+    calibrationClicks: [],
+    fetchInFlight: false  // Guard against overlapping polls
 };
 
 // ============================================================================
@@ -27,23 +30,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initializeApp() {
     try {
-        // Load cameras
         await loadCameras();
-        
-        // Load chords
         await loadChords();
-        
-        // Setup event listeners
         setupEventListeners();
-        
-        // Start detection loop
         startDetectionLoop();
-        
-        // Hide loading screen
-        setTimeout(() => {
-            document.getElementById('loadingScreen').classList.add('hidden');
-        }, 1000);
-        
+
+        // Fade out loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('fade-out');
+            loadingScreen.addEventListener('transitionend', () => {
+                loadingScreen.style.display = 'none';
+            }, { once: true });
+        }
     } catch (error) {
         console.error('Initialization error:', error);
         showError('Failed to initialize app. Please refresh the page.');
@@ -57,11 +56,10 @@ async function initializeApp() {
 async function loadCameras() {
     try {
         const response = await fetch('/api/cameras');
+        if (!response.ok) return;
         const data = await response.json();
-        
         state.availableCameras = data.cameras || [];
         state.currentCameraId = data.current || 0;
-        
         updateCameraSelector();
     } catch (error) {
         console.error('Error loading cameras:', error);
@@ -70,13 +68,14 @@ async function loadCameras() {
 
 function updateCameraSelector() {
     const select = document.getElementById('cameraSelect');
-    
+    if (!select) return;
+
     if (state.availableCameras.length === 0) {
         select.innerHTML = '<option value="">No cameras found</option>';
         return;
     }
-    
-    select.innerHTML = state.availableCameras.map(cam => 
+
+    select.innerHTML = state.availableCameras.map(cam =>
         `<option value="${cam.id}" ${cam.id === state.currentCameraId ? 'selected' : ''}>
             ${cam.name}
         </option>`
@@ -85,21 +84,19 @@ function updateCameraSelector() {
 
 async function switchCamera(cameraId) {
     try {
-        const response = await fetch(`/api/set_camera/${cameraId}`);
+        const response = await fetch(`/api/set_camera/${cameraId}`, { method: 'POST' });
+        if (!response.ok) return;
         const data = await response.json();
-        
+
         if (data.success) {
             state.currentCameraId = cameraId;
             updateCameraSelector();
-            
-            // Reload video feed
+
+            // Reload video feed cleanly
             const videoFeed = document.getElementById('videoFeed');
-            const src = videoFeed.src;
-            videoFeed.src = '';
-            setTimeout(() => {
-                videoFeed.src = src + '?t=' + Date.now();
-            }, 100);
-            
+            if (videoFeed) {
+                videoFeed.src = '/video_feed?t=' + Date.now();
+            }
             showNotification('Camera switched successfully');
         } else {
             showError(data.error || 'Failed to switch camera');
@@ -117,11 +114,10 @@ async function switchCamera(cameraId) {
 async function loadChords() {
     try {
         const response = await fetch('/get_chords');
+        if (!response.ok) return;
         const data = await response.json();
-        
         state.availableChords = data.beginner_chords || data.chords || [];
         state.currentChord = state.availableChords[0] || 'E Minor';
-        
         updateChordSelector();
     } catch (error) {
         console.error('Error loading chords:', error);
@@ -130,14 +126,15 @@ async function loadChords() {
 
 function updateChordSelector() {
     const selector = document.getElementById('chordSelector');
-    
+    if (!selector) return;
+
     if (state.availableChords.length === 0) {
         selector.innerHTML = '<p style="color: rgba(255,255,255,0.7); text-align: center;">No chords available</p>';
         return;
     }
-    
-    selector.innerHTML = state.availableChords.map((chord, index) => 
-        `<button class="chord-btn ${chord === state.currentChord ? 'active' : ''}" 
+
+    selector.innerHTML = state.availableChords.map(chord =>
+        `<button class="chord-btn ${chord === state.currentChord ? 'active' : ''}"
                  data-chord="${chord}"
                  onclick="selectChord('${chord}')">
             ${chord}
@@ -148,19 +145,16 @@ function updateChordSelector() {
 async function selectChord(chordName) {
     try {
         const response = await fetch(`/set_chord/${encodeURIComponent(chordName)}`);
+        if (!response.ok) return;
         const data = await response.json();
-        
+
         if (data.success) {
             state.currentChord = chordName;
-            
-            // Update UI
             document.querySelectorAll('.chord-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.chord === chordName);
             });
-            
             document.getElementById('currentChordName').textContent = chordName;
             document.getElementById('perfectBadge').style.display = 'none';
-            
             showNotification(`Switched to ${chordName}`);
         }
     } catch (error) {
@@ -169,14 +163,14 @@ async function selectChord(chordName) {
 }
 
 // ============================================================================
-// Overlay Management
+// Overlay / Debug / Raw Feed Toggles
 // ============================================================================
 
 async function toggleOverlay() {
     try {
         const response = await fetch('/api/toggle_overlay');
+        if (!response.ok) return;
         const data = await response.json();
-        
         if (data.success) {
             state.overlayEnabled = data.enabled;
             updateOverlayToggle();
@@ -187,9 +181,49 @@ async function toggleOverlay() {
     }
 }
 
+async function toggleDebug() {
+    try {
+        const response = await fetch('/api/toggle_debug', { method: 'POST' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.success) {
+            state.debugMode = data.debug_mode;
+            updateDebugButton();
+            showNotification(`Debug mode ${state.debugMode ? 'enabled' : 'disabled'}`);
+        }
+    } catch (error) {
+        console.error('Error toggling debug:', error);
+    }
+}
+
+async function toggleRawFeed() {
+    try {
+        const response = await fetch('/api/toggle_raw_feed', { method: 'POST' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.success) {
+            state.rawFeed = data.raw_feed;
+            updateRawFeedButton();
+            showNotification(`Raw feed ${state.rawFeed ? 'enabled' : 'disabled'}`);
+        }
+    } catch (error) {
+        console.error('Error toggling raw feed:', error);
+    }
+}
+
 function updateOverlayToggle() {
     const toggle = document.getElementById('overlayToggle');
-    toggle.classList.toggle('active', state.overlayEnabled);
+    if (toggle) toggle.classList.toggle('active', state.overlayEnabled);
+}
+
+function updateDebugButton() {
+    const btn = document.getElementById('debugToggle');
+    if (btn) btn.classList.toggle('active', state.debugMode);
+}
+
+function updateRawFeedButton() {
+    const btn = document.getElementById('rawFeedToggle');
+    if (btn) btn.classList.toggle('active', state.rawFeed);
 }
 
 // ============================================================================
@@ -199,21 +233,17 @@ function updateOverlayToggle() {
 async function setMode(mode) {
     try {
         const response = await fetch(`/set_mode/${mode}`);
+        if (!response.ok) return;
         const data = await response.json();
-        
+
         if (data.success) {
             state.currentMode = mode;
-            
-            // Update buttons
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.mode === mode);
             });
-            
-            // Update content
             document.getElementById('freePlayMode').classList.toggle('active', mode === 'free_play');
             document.getElementById('chordTrainerMode').classList.toggle('active', mode === 'chord_trainer');
-            
-            // Load chords if entering chord trainer
+
             if (mode === 'chord_trainer' && state.availableChords.length === 0) {
                 await loadChords();
             }
@@ -227,15 +257,23 @@ async function setMode(mode) {
 // Detection Loop
 // ============================================================================
 
-async function startDetectionLoop() {
-    setInterval(updateDetectionData, 100); // Update every 100ms
+function startDetectionLoop() {
+    setInterval(updateDetectionData, 500);  // Poll every 500ms (was 100ms)
 }
 
 async function updateDetectionData() {
+    // Skip if a request is already in flight
+    if (state.fetchInFlight) return;
+    state.fetchInFlight = true;
+
     try {
         const response = await fetch('/detection_data');
+        if (!response.ok) {
+            state.fetchInFlight = false;
+            return;
+        }
         const data = await response.json();
-        
+
         // Calculate FPS
         state.frameCount++;
         const now = Date.now();
@@ -243,28 +281,26 @@ async function updateDetectionData() {
             state.fps = state.frameCount;
             state.frameCount = 0;
             state.lastTime = now;
-            document.getElementById('fpsDisplay').textContent = `${state.fps} FPS`;
+            const fpsEl = document.getElementById('fpsDisplay');
+            if (fpsEl) fpsEl.textContent = `${state.fps} FPS`;
         }
-        
-        // Update detection status
+
         updateDetectionStatus(data);
-        
-        // Update mode-specific content
+
         if (state.currentMode === 'free_play') {
             updateFreePlayMode(data);
         } else if (state.currentMode === 'chord_trainer') {
             updateChordTrainerMode(data);
         }
-        
-        // Hide video placeholder if video is working
+
         const placeholder = document.getElementById('videoPlaceholder');
-        if (data.neck_detected !== undefined) {
+        if (placeholder && data.neck_detected !== undefined) {
             placeholder.classList.add('hidden');
         }
-        
     } catch (error) {
         console.error('Error fetching detection data:', error);
-        document.getElementById('videoPlaceholder').classList.remove('hidden');
+    } finally {
+        state.fetchInFlight = false;
     }
 }
 
@@ -272,7 +308,8 @@ function updateDetectionStatus(data) {
     const statusElement = document.getElementById('detectionStatus');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
-    
+    if (!statusElement || !statusDot || !statusText) return;
+
     if (data.neck_detected) {
         statusElement.className = 'overlay-card detection-status success';
         statusElement.innerHTML = '<span class="status-icon">✓</span><span>Guitar Detected</span>';
@@ -287,32 +324,34 @@ function updateDetectionStatus(data) {
 }
 
 function updateFreePlayMode(data) {
-    // Update audio detection
     const audioNote = document.getElementById('audioNote');
     const audioFreq = document.getElementById('audioFreq');
-    
-    if (data.audio_note) {
-        audioNote.textContent = data.audio_note;
-        audioFreq.textContent = `${data.audio_freq.toFixed(1)} Hz`;
-    } else {
-        audioNote.textContent = '--';
-        audioFreq.textContent = 'Listening...';
+
+    if (audioNote && audioFreq) {
+        if (data.audio_note) {
+            audioNote.textContent = data.audio_note;
+            audioFreq.textContent = `${data.audio_freq.toFixed(1)} Hz`;
+        } else {
+            audioNote.textContent = '--';
+            audioFreq.textContent = 'Listening...';
+        }
     }
-    
-    // Update stats
-    document.getElementById('neckStatus').textContent = data.neck_detected ? '✓' : '✗';
-    document.getElementById('fretsCount').textContent = data.frets_detected || 0;
-    
-    // Update detected notes
+
+    const neckEl = document.getElementById('neckStatus');
+    const fretsEl = document.getElementById('fretsCount');
+    if (neckEl) neckEl.textContent = data.neck_detected ? '✓' : '✗';
+    if (fretsEl) fretsEl.textContent = data.frets_detected || 0;
+
     updateNotesList(data.notes || []);
 }
 
 function updateNotesList(notes) {
     const notesList = document.getElementById('notesList');
     const notesCount = document.getElementById('notesCount');
-    
+    if (!notesList || !notesCount) return;
+
     notesCount.textContent = notes.length;
-    
+
     if (notes.length === 0) {
         notesList.innerHTML = `
             <div class="empty-state">
@@ -325,15 +364,14 @@ function updateNotesList(notes) {
         `;
         return;
     }
-    
+
     notesList.innerHTML = notes.map(note => {
         const matchClass = note.matches_audio === true ? 'correct' :
                           note.matches_audio === false ? 'incorrect' : '';
         const badge = note.matches_audio === true ? '✓' :
                      note.matches_audio === false ? '?' : '•';
-        
         const position = note.fret === 0 ? 'Open' : `Fret ${note.fret}`;
-        
+
         return `
             <div class="note-item ${matchClass}">
                 <div class="note-info">
@@ -349,65 +387,72 @@ function updateNotesList(notes) {
 }
 
 function updateChordTrainerMode(data) {
-    // Update stats
-    document.getElementById('neckStatus2').textContent = data.neck_detected ? '✓' : '✗';
-    document.getElementById('fretsCount2').textContent = data.frets_detected || 0;
-    
-    // Update chord evaluation
+    const neckEl = document.getElementById('neckStatus2');
+    const fretsEl = document.getElementById('fretsCount2');
+    if (neckEl) neckEl.textContent = data.neck_detected ? '✓' : '✗';
+    if (fretsEl) fretsEl.textContent = data.frets_detected || 0;
+
     if (data.evaluation && data.target_chord) {
-        const eval = data.evaluation;
+        const chordEval = data.evaluation;
         const chord = data.target_chord;
-        
-        // Update progress ring
-        const progressPercent = Math.round(eval.accuracy);
-        document.getElementById('progressPercent').textContent = `${progressPercent}%`;
-        
+
+        const progressPercent = Math.round(chordEval.accuracy);
+        const percentEl = document.getElementById('progressPercent');
+        if (percentEl) percentEl.textContent = `${progressPercent}%`;
+
         const progressBar = document.getElementById('progressBar');
-        const circumference = 2 * Math.PI * 45;
-        const offset = circumference - (progressPercent / 100) * circumference;
-        progressBar.style.strokeDashoffset = offset;
-        
-        // Update finger checklist
+        if (progressBar) {
+            const circumference = 2 * Math.PI * 45;
+            const offset = circumference - (progressPercent / 100) * circumference;
+            progressBar.style.strokeDashoffset = offset;
+        }
+
         const checklist = document.getElementById('fingerChecklist');
-        checklist.innerHTML = chord.fingering.map(([string, fret, finger]) => {
-            const isCorrect = eval.correct_fingers.some(cf => 
-                cf.target[0] === string && cf.target[1] === fret && cf.target[2] === finger
-            );
-            
-            return `
-                <div class="finger-item ${isCorrect ? 'correct' : ''}">
-                    <div class="finger-checkbox ${isCorrect ? 'checked' : ''}">
-                        ${isCorrect ? '✓' : ''}
+        if (checklist) {
+            checklist.innerHTML = chord.fingering.map(([string, fret, finger]) => {
+                const isCorrect = chordEval.correct_fingers.some(cf =>
+                    cf.target[0] === string && cf.target[1] === fret && cf.target[2] === finger
+                );
+                return `
+                    <div class="finger-item ${isCorrect ? 'correct' : ''}">
+                        <div class="finger-checkbox ${isCorrect ? 'checked' : ''}">
+                            ${isCorrect ? '✓' : ''}
+                        </div>
+                        <div>
+                            <strong>${finger}</strong>: String ${string}, Fret ${fret}
+                        </div>
                     </div>
-                    <div>
-                        <strong>${finger}</strong>: String ${string}, Fret ${fret}
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        // Show perfect badge
-        document.getElementById('perfectBadge').style.display = 
-            eval.is_perfect ? 'flex' : 'none';
+                `;
+            }).join('');
+        }
+
+        const perfectBadge = document.getElementById('perfectBadge');
+        if (perfectBadge) {
+            perfectBadge.style.display = chordEval.is_perfect ? 'flex' : 'none';
+        }
     } else {
-        // No fingers detected
-        document.getElementById('progressPercent').textContent = '0%';
+        const percentEl = document.getElementById('progressPercent');
+        if (percentEl) percentEl.textContent = '0%';
+
         const progressBar = document.getElementById('progressBar');
-        progressBar.style.strokeDashoffset = 2 * Math.PI * 45;
-        
+        if (progressBar) progressBar.style.strokeDashoffset = 2 * Math.PI * 45;
+
         if (data.target_chord) {
             const checklist = document.getElementById('fingerChecklist');
-            checklist.innerHTML = data.target_chord.fingering.map(([string, fret, finger]) => `
-                <div class="finger-item">
-                    <div class="finger-checkbox"></div>
-                    <div>
-                        <strong>${finger}</strong>: String ${string}, Fret ${fret}
+            if (checklist) {
+                checklist.innerHTML = data.target_chord.fingering.map(([string, fret, finger]) => `
+                    <div class="finger-item">
+                        <div class="finger-checkbox"></div>
+                        <div>
+                            <strong>${finger}</strong>: String ${string}, Fret ${fret}
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            }
         }
-        
-        document.getElementById('perfectBadge').style.display = 'none';
+
+        const perfectBadge = document.getElementById('perfectBadge');
+        if (perfectBadge) perfectBadge.style.display = 'none';
     }
 }
 
@@ -417,67 +462,71 @@ function updateChordTrainerMode(data) {
 
 function setupEventListeners() {
     // Camera selector
-    document.getElementById('cameraSelect').addEventListener('change', (e) => {
-        const cameraId = parseInt(e.target.value);
-        if (!isNaN(cameraId)) {
-            switchCamera(cameraId);
-        }
-    });
-    
+    const cameraSelect = document.getElementById('cameraSelect');
+    if (cameraSelect) {
+        cameraSelect.addEventListener('change', (e) => {
+            const cameraId = parseInt(e.target.value);
+            if (!isNaN(cameraId)) switchCamera(cameraId);
+        });
+    }
+
     // Mode buttons
     document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const mode = btn.dataset.mode;
-            setMode(mode);
-        });
+        btn.addEventListener('click', () => setMode(btn.dataset.mode));
     });
-    
-    // Overlay toggle
-    document.getElementById('overlayToggle').addEventListener('click', toggleOverlay);
-    
-    // Video feed click handler for calibration
+
+    // Toggle buttons (single registration each)
+    const overlayToggle = document.getElementById('overlayToggle');
+    if (overlayToggle) overlayToggle.addEventListener('click', toggleOverlay);
+
+    const debugToggle = document.getElementById('debugToggle');
+    if (debugToggle) debugToggle.addEventListener('click', toggleDebug);
+
+    const rawFeedToggle = document.getElementById('rawFeedToggle');
+    if (rawFeedToggle) rawFeedToggle.addEventListener('click', toggleRawFeed);
+
+    // Video click handler for calibration
     const videoFeed = document.getElementById('videoFeed');
-    videoFeed.addEventListener('click', handleVideoClick);
-    
+    if (videoFeed) videoFeed.addEventListener('click', handleVideoClick);
+
     // Initial overlay state
     updateOverlayToggle();
-    
-    // Check overlay status on load
+
+    // Sync overlay status from server
     fetch('/api/overlay_status')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error('Not OK');
+            return res.json();
+        })
         .then(data => {
             state.overlayEnabled = data.enabled;
-            if (data.chord) {
-                state.currentChord = data.chord;
-            }
+            if (data.chord) state.currentChord = data.chord;
             updateOverlayToggle();
         })
         .catch(err => console.error('Error fetching overlay status:', err));
 }
 
+// ============================================================================
+// Calibration
+// ============================================================================
+
 function handleVideoClick(event) {
     if (!state.calibrationMode) return;
-    
+
     const videoFeed = document.getElementById('videoFeed');
     const rect = videoFeed.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    
-    // Scale coordinates to video dimensions
+
     const videoWidth = videoFeed.videoWidth || videoFeed.naturalWidth || rect.width;
     const videoHeight = videoFeed.videoHeight || videoFeed.naturalHeight || rect.height;
-    const scaleX = videoWidth / rect.width;
     const scaleY = videoHeight / rect.height;
-    
     const scaledY = y * scaleY;
-    
+
     state.calibrationClicks.push(scaledY);
-    
-    // Visual feedback
     showCalibrationFeedback(x, y, state.calibrationClicks.length);
-    
+
     if (state.calibrationClicks.length >= 6) {
-        // Send calibration data
         calibrateStrings(state.calibrationClicks);
         state.calibrationMode = false;
         state.calibrationClicks = [];
@@ -485,47 +534,36 @@ function handleVideoClick(event) {
 }
 
 function showCalibrationFeedback(x, y, clickNumber) {
-    // Create temporary marker
     const marker = document.createElement('div');
-    marker.style.position = 'absolute';
-    marker.style.left = x + 'px';
-    marker.style.top = y + 'px';
-    marker.style.width = '20px';
-    marker.style.height = '20px';
-    marker.style.borderRadius = '50%';
-    marker.style.background = '#34c759';
-    marker.style.border = '2px solid white';
-    marker.style.display = 'flex';
-    marker.style.alignItems = 'center';
-    marker.style.justifyContent = 'center';
-    marker.style.color = 'white';
-    marker.style.fontSize = '12px';
-    marker.style.fontWeight = 'bold';
-    marker.style.pointerEvents = 'none';
-    marker.style.zIndex = '1000';
+    marker.style.cssText = `
+        position: absolute; left: ${x}px; top: ${y}px;
+        width: 20px; height: 20px; border-radius: 50%;
+        background: #34c759; border: 2px solid white;
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-size: 12px; font-weight: bold;
+        pointer-events: none; z-index: 1000;
+    `;
     marker.textContent = clickNumber;
-    
+
     const videoWrapper = document.querySelector('.video-wrapper');
-    videoWrapper.appendChild(marker);
-    
-    setTimeout(() => marker.remove(), 2000);
+    if (videoWrapper) {
+        videoWrapper.appendChild(marker);
+        setTimeout(() => marker.remove(), 2000);
+    }
 }
 
 async function calibrateStrings(positions) {
     try {
         const response = await fetch('/api/calibrate_strings', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ positions: positions })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ positions })
         });
-        
+        if (!response.ok) return;
         const data = await response.json();
-        
+
         if (data.success) {
-            showNotification('String calibration saved! Overlay should now be accurate.');
-            // Reload page to apply calibration
+            showNotification('String calibration saved!');
             setTimeout(() => location.reload(), 1000);
         } else {
             showError(data.error || 'Calibration failed');
@@ -545,8 +583,8 @@ function startCalibration() {
 async function resetCalibration() {
     try {
         const response = await fetch('/api/reset_calibration', { method: 'POST' });
+        if (!response.ok) return;
         const data = await response.json();
-        
         if (data.success) {
             showNotification('Calibration reset. Using auto-detection.');
             location.reload();
@@ -561,12 +599,10 @@ async function resetCalibration() {
 // ============================================================================
 
 function showNotification(message) {
-    // Simple notification - could be enhanced with a toast library
     console.log('Notification:', message);
 }
 
 function showError(message) {
-    // Simple error display - could be enhanced
     console.error('Error:', message);
     alert(message);
 }
@@ -575,6 +611,8 @@ function showError(message) {
 window.selectChord = selectChord;
 window.switchCamera = switchCamera;
 window.toggleOverlay = toggleOverlay;
+window.toggleDebug = toggleDebug;
+window.toggleRawFeed = toggleRawFeed;
 window.setMode = setMode;
 window.startCalibration = startCalibration;
 window.resetCalibration = resetCalibration;
