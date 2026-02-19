@@ -62,7 +62,7 @@ There's a **Debug** button if you want to see the raw detection (neck box, frets
 
 ## How it works (the short version)
 
-I trained a YOLO model on a bunch of labeled guitar images to detect the neck, frets, and nut. Strings are trickier—pure ML was too noisy—so I use a geometric model (tapered spacing, wider at the nut) and refine it with edge detection and fret intersections. Hand tracking is MediaPipe. Audio is librosa for pitch detection. Everything runs in a Flask app that streams the video with overlays to your browser.
+I trained a YOLO model on a bunch of labeled guitar images to detect the neck, frets, and nut. Strings are trickier, pure ML was too noisy, so I use a geometric model (tapered spacing, wider at the nut) and refine it with edge detection and fret intersections. Hand tracking is MediaPipe. Audio is librosa for pitch detection. Everything runs in a Flask app that streams the video with overlays to your browser.
 
 ## Project structure
 
